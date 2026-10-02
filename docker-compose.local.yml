@@ -3,7 +3,7 @@
 services:
   collector:
     environment:
-      INTERVAL_SECONDS: 30
+      INTERVAL_SECONDS: 10
   db:
     ports:
       - "5432:5432"

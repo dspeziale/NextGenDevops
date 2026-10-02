@@ -15,7 +15,9 @@ import requests
 
 APP_VERSION = os.getenv("APP_VERSION", "dev")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://app:app@db:5432/nextgen")
-INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "5"))
+INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "10"))
+# aggiornato dopo ogni ciclo con almeno una lettura salvata; lo controlla healthcheck.py
+HEARTBEAT_FILE = "/tmp/heartbeat"
 
 # nome -> (latitudine, longitudine)
 CITIES = {
@@ -112,6 +114,9 @@ def collect(conn: psycopg.Connection) -> None:
         saved += 1
         log.info("%s: %s C, vento %s km/h", city, row["temperature_c"], row["windspeed_kmh"])
     log.info("Ciclo completato: %d/%d letture salvate", saved, len(CITIES))
+    if saved:
+        with open(HEARTBEAT_FILE, "w") as f:
+            f.write(str(time.time()))
 
 
 def main() -> None:

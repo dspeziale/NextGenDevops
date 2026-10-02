@@ -1,6 +1,6 @@
 # NextGenDevops
 
-Container Python che ogni 5 minuti scarica il meteo corrente di alcune città italiane da
+Container Python che ogni 10 secondi scarica il meteo corrente di alcune città italiane da
 [Open-Meteo](https://open-meteo.com) (API pubblica, senza chiave) e lo salva in PostgreSQL.
 Il deploy avviene con **Coolify**, il versioning è basato su **tag git semantici** (`vX.Y.Z`):
 Coolify clona il repository **al tag** della versione scelta e builda l'immagine da lì.
@@ -84,7 +84,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml down -v
    | `POSTGRES_PASSWORD` | una password robusta |
    | `POSTGRES_USER` | `app` (opzionale) |
    | `POSTGRES_DB` | `nextgen` (opzionale) |
-   | `INTERVAL_SECONDS` | `300` (opzionale) |
+   | `INTERVAL_SECONDS` | `10` (secondi tra un ciclo e l'altro) |
 7. Premi **Deploy**. Nella scheda **Logs** del servizio `collector` vedrai:
    `Avvio NextGenDevops collector versione 1.0.1` e le letture delle città.
 
