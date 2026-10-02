@@ -1,16 +1,21 @@
 # Crea una nuova versione: .\scripts\release.ps1 1.1.0
 # Aggiorna VERSION, crea il tag vX.Y.Z e lo pusha -> GitHub Actions builda l'immagine.
 param([Parameter(Mandatory = $true)][string]$Version)
-$ErrorActionPreference = 'Stop'
 
-function Invoke-Git { git @args; if ($LASTEXITCODE -ne 0) { throw "git $args fallito" } }
+# Niente $ErrorActionPreference='Stop': in Windows PowerShell 5.1 trasformerebbe in errore
+# anche i normali messaggi che git scrive su stderr (es. l'avanzamento di "git push").
+# Gli errori di git si controllano con $LASTEXITCODE.
+function Invoke-Git {
+    & git @args
+    if ($LASTEXITCODE -ne 0) { throw "Comando fallito: git $args" }
+}
 
 if ($Version -notmatch '^\d+\.\d+\.\d+$') {
     throw "Formato atteso X.Y.Z (versione attuale: $(Get-Content VERSION))"
 }
-git rev-parse "v$Version" 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) { throw "Il tag v$Version esiste gia'" }
+if (git tag --list "v$Version") { throw "Il tag v$Version esiste gia'" }
 if (git status --porcelain) { throw "Ci sono modifiche non committate: committale prima del rilascio" }
+if (-not (git remote)) { throw "Nessun remote configurato: esegui prima 'git remote add origin https://github.com/<owner>/NextGenDevops.git'" }
 
 [IO.File]::WriteAllText("$PWD\VERSION", "$Version`n")
 Invoke-Git add VERSION

@@ -5,7 +5,7 @@
 #   .\scripts\deploy.ps1 1.1.0      # aggiorna
 #   .\scripts\deploy.ps1 1.0.0      # rollback
 param([Parameter(Mandatory = $true)][string]$Version)
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'   # qui va bene: nessun comando nativo, solo Invoke-RestMethod
 
 foreach ($name in 'COOLIFY_URL', 'COOLIFY_TOKEN', 'COOLIFY_APP_UUID') {
     if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Imposta `$env:$name" }
