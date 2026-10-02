@@ -15,7 +15,7 @@ import requests
 
 APP_VERSION = os.getenv("APP_VERSION", "dev")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://app:app@db:5432/nextgen")
-INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "300"))
+INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "5"))
 
 # nome -> (latitudine, longitudine)
 CITIES = {

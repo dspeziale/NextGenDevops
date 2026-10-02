@@ -25,7 +25,7 @@ Invoke-RestMethod -Method Patch -Uri "$app/envs" -Headers $headers -ContentType 
     -Body (@{ key = 'APP_VERSION'; value = $Version } | ConvertTo-Json) | Out-Null
 
 Write-Host "Avvio deploy"
-$res = Invoke-RestMethod -Uri "$api/deploy?uuid=$env:COOLIFY_APP_UUID&force=false" -Headers $headers
+$res = Invoke-RestMethod -Method Post -Uri "$api/deploy?uuid=$env:COOLIFY_APP_UUID&force=false" -Headers $headers
 $deployment = $res.deployments[0].deployment_uuid
 Write-Host "Deployment $deployment avviato, attendo l'esito..."
 

@@ -23,5 +23,5 @@ curl -fsS -X PATCH "${AUTH[@]}" "$API/applications/$COOLIFY_APP_UUID/envs" \
   -d "{\"key\":\"APP_VERSION\",\"value\":\"$VERSION\"}" >/dev/null
 
 echo "Avvio deploy"
-curl -fsS "${AUTH[@]}" "$API/deploy?uuid=$COOLIFY_APP_UUID&force=false"
+curl -fsS -X POST "${AUTH[@]}" "$API/deploy?uuid=$COOLIFY_APP_UUID&force=false"
 echo
