@@ -1,0 +1,31 @@
+# Compose usato da Coolify (risorsa "Docker Compose").
+# La versione da deployare si sceglie con la variabile APP_VERSION in Coolify:
+# cambiarla e premere "Deploy" = aggiornamento o rollback.
+services:
+  collector:
+    image: ghcr.io/${GITHUB_OWNER}/nextgendevops:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-nextgen}
+      INTERVAL_SECONDS: ${INTERVAL_SECONDS:-300}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-nextgen}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

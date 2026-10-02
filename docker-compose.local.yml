@@ -1,0 +1,14 @@
+# Override per sviluppo locale: costruisce l'immagine dal sorgente invece di scaricarla da GHCR.
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+services:
+  collector:
+    image: nextgendevops:local
+    build:
+      context: .
+      args:
+        APP_VERSION: local
+    environment:
+      INTERVAL_SECONDS: 30
+  db:
+    ports:
+      - "5432:5432"

@@ -1,0 +1,5 @@
+.env
+account.txt
+__pycache__/
+*.pyc
+.venv/
