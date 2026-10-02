@@ -1,20 +1,36 @@
 # Deploy (o rollback) di una versione su Coolify via API.
-#   $env:COOLIFY_URL      = "http://10.20.23.64:8000"
-#   $env:COOLIFY_TOKEN    = "..."   # Coolify > Keys & Tokens > API tokens
-#   $env:COOLIFY_APP_UUID = "..."   # UUID della risorsa NextGenDevops in Coolify
 #   .\scripts\deploy.ps1 1.1.0      # aggiorna
 #   .\scripts\deploy.ps1 1.0.1      # rollback
+# Il token API (Coolify > Keys & Tokens > API tokens) viene chiesto se $env:COOLIFY_TOKEN non e' impostato.
+# URL e UUID dell'applicazione hanno un default, sovrascrivibile con $env:COOLIFY_URL / $env:COOLIFY_APP_UUID.
 # Coolify clona il repo al tag vX.Y.Z, builda l'immagine con APP_VERSION=X.Y.Z e la avvia.
 param([Parameter(Mandatory = $true)][string]$Version)
 $ErrorActionPreference = 'Stop'   # qui va bene: nessun comando nativo, solo Invoke-RestMethod
 
-foreach ($name in 'COOLIFY_URL', 'COOLIFY_TOKEN', 'COOLIFY_APP_UUID') {
-    if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Imposta `$env:$name" }
-}
+if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Formato atteso X.Y.Z" }
 
-$api = "$($env:COOLIFY_URL.TrimEnd('/'))/api/v1"
-$app = "$api/applications/$env:COOLIFY_APP_UUID"
-$headers = @{ Authorization = "Bearer $env:COOLIFY_TOKEN" }
+$url = if ($env:COOLIFY_URL) { $env:COOLIFY_URL } else { 'http://10.20.23.64:8000' }
+$uuid = if ($env:COOLIFY_APP_UUID) { $env:COOLIFY_APP_UUID } else { '0ldidmberbwan7h0d89lrviy' }
+$token = $env:COOLIFY_TOKEN
+if (-not $token -or $token -match '^<.*>$') {
+    $secure = Read-Host 'Token API Coolify' -AsSecureString
+    $token = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+}
+$token = $token.Trim()
+
+$api = "$($url.TrimEnd('/'))/api/v1"
+$app = "$api/applications/$uuid"
+$headers = @{ Authorization = "Bearer $token" }
+
+try {
+    Invoke-RestMethod -Uri $app -Headers $headers | Out-Null
+} catch {
+    $code = [int]$_.Exception.Response.StatusCode
+    if ($code -eq 401) { throw "Token rifiutato da Coolify (401). Usa il token completo, incluso il prefisso 'N|'." }
+    if ($code -eq 404) { throw "Applicazione $uuid non trovata su $url" }
+    throw
+}
 
 Write-Host "Imposto sorgente = tag v$Version"
 Invoke-RestMethod -Method Patch -Uri $app -Headers $headers -ContentType 'application/json' `
@@ -25,7 +41,7 @@ Invoke-RestMethod -Method Patch -Uri "$app/envs" -Headers $headers -ContentType 
     -Body (@{ key = 'APP_VERSION'; value = $Version } | ConvertTo-Json) | Out-Null
 
 Write-Host "Avvio deploy"
-$res = Invoke-RestMethod -Method Post -Uri "$api/deploy?uuid=$env:COOLIFY_APP_UUID&force=false" -Headers $headers
+$res = Invoke-RestMethod -Method Post -Uri "$api/deploy?uuid=$uuid&force=false" -Headers $headers
 $deployment = $res.deployments[0].deployment_uuid
 Write-Host "Deployment $deployment avviato, attendo l'esito..."
 
