@@ -1,7 +1,8 @@
 # Deploy (o rollback) di una versione su Coolify via API.
 #   .\scripts\deploy.ps1 1.1.0      # aggiorna
 #   .\scripts\deploy.ps1 1.0.1      # rollback
-# Il token API (Coolify > Keys & Tokens > API tokens) viene chiesto se $env:COOLIFY_TOKEN non e' impostato.
+# Token API (Coolify > Keys & Tokens > API tokens), in ordine: $env:COOLIFY_TOKEN, file .coolify-token
+# nella radice del progetto (escluso da git), altrimenti viene chiesto a video.
 # URL e UUID dell'applicazione hanno un default, sovrascrivibile con $env:COOLIFY_URL / $env:COOLIFY_APP_UUID.
 # Coolify clona il repo al tag vX.Y.Z, builda l'immagine con APP_VERSION=X.Y.Z e la avvia.
 param([Parameter(Mandatory = $true)][string]$Version)
@@ -12,12 +13,18 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Formato atteso X.Y.Z" }
 $url = if ($env:COOLIFY_URL) { $env:COOLIFY_URL } else { 'http://10.20.23.64:8000' }
 $uuid = if ($env:COOLIFY_APP_UUID) { $env:COOLIFY_APP_UUID } else { '0ldidmberbwan7h0d89lrviy' }
 $token = $env:COOLIFY_TOKEN
+$tokenFile = Join-Path $PSScriptRoot '..\.coolify-token'   # file locale, escluso da git
+if ((-not $token -or $token -match '^<.*>$') -and (Test-Path $tokenFile)) {
+    $token = (Get-Content $tokenFile -Raw)
+}
 if (-not $token -or $token -match '^<.*>$') {
+    Write-Host "Suggerimento: incolla con il tasto destro del mouse (Ctrl+V puo' non funzionare)."
     $secure = Read-Host 'Token API Coolify' -AsSecureString
     $token = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
         [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
 }
 $token = $token.Trim()
+Write-Host "Token letto: $($token.Length) caratteri (atteso circa 50, formato N|...)"
 
 $api = "$($url.TrimEnd('/'))/api/v1"
 $app = "$api/applications/$uuid"

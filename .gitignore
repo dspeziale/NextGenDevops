@@ -3,3 +3,4 @@ account.txt
 __pycache__/
 *.pyc
 .venv/
+.coolify-token
