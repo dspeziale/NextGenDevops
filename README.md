@@ -2,12 +2,22 @@
 
 Container Python che ogni 5 minuti scarica il meteo corrente di alcune città italiane da
 [Open-Meteo](https://open-meteo.com) (API pubblica, senza chiave) e lo salva in PostgreSQL.
-Il deploy avviene con **Coolify**, il versioning è basato su **tag git semantici** (`vX.Y.Z`) e
-**immagini Docker immutabili** su GitHub Container Registry (GHCR).
+Il deploy avviene con **Coolify**, il versioning è basato su **tag git semantici** (`vX.Y.Z`):
+Coolify clona il repository **al tag** della versione scelta e builda l'immagine da lì.
+GitHub Actions in parallelo verifica la build e pubblica l'immagine su GHCR e la GitHub Release.
 
 ```
-git tag v1.2.0 ──► GitHub Actions ──► ghcr.io/<owner>/nextgendevops:1.2.0 ──► Coolify (APP_VERSION=1.2.0)
+release.ps1 1.2.0 ──► tag v1.2.0 su GitHub ──► deploy.ps1 1.2.0 ──► Coolify clona v1.2.0, builda e avvia
 ```
+
+**Ambiente attuale**
+
+| | |
+|---|---|
+| Repository | https://github.com/dspeziale/NextGenDevops (pubblico) |
+| Coolify | http://10.20.23.64:8000 (le API rispondono sulla porta **8000**) |
+| Progetto Coolify | `NextGenDevops`, environment `production` |
+| UUID applicazione | `0ldidmberbwan7h0d89lrviy` |
 
 > I comandi sono per **PowerShell su Windows** (con Docker Desktop e Git for Windows installati).
 > Se PowerShell blocca gli script, una tantum: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
@@ -54,38 +64,38 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml down -v
    ```powershell
    .\scripts\release.ps1 1.0.0
    ```
-3. Su GitHub > **Actions** controlla che il workflow *Build & Release* sia verde.
-   In **Packages** compare `nextgendevops` con i tag `1.0.0`, `1.0`, `latest`.
-4. **Visibilità del package**: GHCR crea i package come *privati*. Due possibilità:
-   - Package > *Package settings* > *Change visibility* > **Public** (più semplice), oppure
-   - lasciarlo privato e fare login a GHCR sul server di Coolify
-     (Coolify > Servers > il tuo server > Terminal: `docker login ghcr.io -u <owner>` con un PAT che abbia `read:packages`).
+3. Su GitHub > **Actions** controlla che il workflow *Build & Release* sia verde
+   (conferma che il tag builda correttamente prima di deployarlo).
 
 ## 2. Configurare Coolify (passo passo)
 
-1. Apri Coolify (`http://10.20.23.64`) > **Projects** > **+ Add** > nome `NextGenDevops`.
+> Questa configurazione è **già stata fatta** sull'ambiente attuale. I passi servono per capire
+> cosa c'è e per rifarla su un altro server.
+
+1. Apri Coolify (`http://10.20.23.64:8000`) > **Projects** > **+ Add** > nome `NextGenDevops`.
 2. Dentro il progetto, environment `production` > **+ New Resource**.
 3. Scegli **Public Repository** (o *Private Repository (with GitHub App)* se il repo è privato).
-4. URL repository: `https://github.com/<owner>/NextGenDevops`, branch `main`.
+4. URL repository: `https://github.com/dspeziale/NextGenDevops`, branch: il **tag** da deployare, es. `v1.0.1`.
 5. **Build Pack**: seleziona **Docker Compose**, file `/docker-compose.yml`. Conferma.
-6. Scheda **Environment Variables** — aggiungi:
+6. Scheda **Environment Variables**: Coolify le crea leggendo il compose; imposta i valori:
    | Chiave | Valore |
    |---|---|
-   | `GITHUB_OWNER` | il tuo utente GitHub, **minuscolo** |
-   | `APP_VERSION` | `1.0.0` |
+   | `APP_VERSION` | uguale al tag senza `v`, es. `1.0.1` |
    | `POSTGRES_PASSWORD` | una password robusta |
    | `POSTGRES_USER` | `app` (opzionale) |
    | `POSTGRES_DB` | `nextgen` (opzionale) |
    | `INTERVAL_SECONDS` | `300` (opzionale) |
 7. Premi **Deploy**. Nella scheda **Logs** del servizio `collector` vedrai:
-   `Avvio NextGenDevops collector versione 1.0.0` e le letture delle città.
-8. (Opzionale) In **Webhooks** / **Advanced** disattiva l'auto-deploy su push: con questo flusso
-   il deploy lo decidi tu cambiando `APP_VERSION`, così un push su `main` non cambia la produzione.
+   `Avvio NextGenDevops collector versione 1.0.1` e le letture delle città.
+
+Poiché Coolify segue un **tag** e non `main`, un push su `main` non cambia la produzione:
+la versione in esecuzione cambia solo quando lo decidi tu con `deploy.ps1`.
 
 > Il volume `pgdata` è persistente: aggiornamenti e rollback del collector **non** cancellano i dati.
 
-Per usare `scripts\deploy.ps1` copia l'UUID della risorsa (è nell'URL della pagina in Coolify) e crea
-un token in **Keys & Tokens > API tokens** (permesso *write*/*deploy*).
+Per usare `scripts\deploy.ps1` serve l'UUID della risorsa (sopra, oppure nell'URL della pagina in Coolify)
+e un token creato in **Keys & Tokens > API tokens** (permesso *write*/*deploy*).
+Lo script cambia il tag sorgente e `APP_VERSION`, avvia il deploy e attende l'esito.
 
 ## 3. Rilasciare una nuova versione
 
@@ -99,16 +109,17 @@ git push -u origin feat/bologna          # apri una PR e fai merge su main
 git checkout main; git pull
 
 # 2. rilascia
-.\scripts\release.ps1 1.1.0              # crea il tag v1.1.0 -> GitHub Actions builda l'immagine 1.1.0
+.\scripts\release.ps1 1.1.0              # crea e pusha il tag v1.1.0 (GitHub Actions lo verifica)
 
-# 3. deploy (quando la Action è verde)
-$env:COOLIFY_URL      = "http://10.20.23.64"
+# 3. deploy
+$env:COOLIFY_URL      = "http://10.20.23.64:8000"
 $env:COOLIFY_TOKEN    = "<token API Coolify>"
-$env:COOLIFY_APP_UUID = "<uuid risorsa>"
+$env:COOLIFY_APP_UUID = "0ldidmberbwan7h0d89lrviy"
 .\scripts\deploy.ps1 1.1.0
 ```
 
-Oppure da interfaccia: Coolify > risorsa > **Environment Variables** > `APP_VERSION=1.1.0` > **Redeploy**.
+Oppure da interfaccia: Coolify > risorsa > **Configuration** > *Git Branch* = `v1.1.0`,
+**Environment Variables** > `APP_VERSION=1.1.0`, poi **Deploy**.
 
 ### Regole di versioning (SemVer)
 
@@ -116,16 +127,16 @@ Oppure da interfaccia: Coolify > risorsa > **Environment Variables** > `APP_VERS
 - `MINOR` (1.**2**.0): nuove funzionalità compatibili (nuove città, nuovi campi *aggiunti*).
 - `MAJOR` (**2**.0.0): cambi incompatibili (es. schema DB modificato in modo non retrocompatibile).
 
-Ogni immagine pubblicata è **immutabile**: `1.1.0` resta sempre identica, quindi tornare indietro
-significa solo dire a Coolify di eseguire un tag precedente.
+Un tag è **immutabile** (non spostarlo mai: per una correzione crea una nuova versione), quindi
+`v1.1.0` produce sempre lo stesso codice e tornare indietro significa solo deployare un tag precedente.
 
 ## 4. Rollback se qualcosa va storto
 
 **Opzione A – cambiare versione (consigliata)**
 ```powershell
-.\scripts\deploy.ps1 1.0.0
+.\scripts\deploy.ps1 1.0.1
 ```
-oppure in Coolify `APP_VERSION=1.0.0` > **Redeploy**. Pochi secondi, nessuna rebuild.
+oppure in Coolify *Git Branch* = `v1.0.1` e `APP_VERSION=1.0.1` > **Deploy**. Circa un minuto.
 
 **Opzione B – Rollback integrato di Coolify**
 Risorsa > scheda **Rollback**: Coolify elenca i deploy precedenti; premi *Rollback* su quello buono.
